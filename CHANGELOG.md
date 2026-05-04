@@ -4,6 +4,8 @@ All notable changes to Building-Regulariser are documented here.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-05-04
+
 ### Added
 - Pre-commit configuration (`ruff-check`, `ruff-format`, and a pre-push
   `pytest` hook).
@@ -11,11 +13,17 @@ All notable changes to Building-Regulariser are documented here.
   every push and pull request.
 - GitHub Actions publish workflow that builds the package and pushes to
   PyPI via OIDC trusted publishing on `v*` tag pushes.
+- `py.typed` marker so downstream type checkers pick up the package's
+  type hints.
+- Multipolygon regression tests covering self-intersecting and
+  vertex-touching inputs.
 
 ### Changed
 - Versioning is now derived from git tags via `setuptools-scm`. The
   hardcoded `__version__.py` has been removed; `__version__` is now
   read at runtime from package metadata via `importlib.metadata`.
+- `regularize_single_polygon` signature widened to
+  `Polygon | MultiPolygon` to match its actual runtime behaviour.
 - `uv.lock` is no longer tracked in version control.
 
 ### Fixed
@@ -118,7 +126,8 @@ All notable changes to Building-Regulariser are documented here.
 - Initial public release with the core `regularize_geodataframe` API
   for aligning building polygon edges to principal directions.
 
-[Unreleased]: https://github.com/DPIRD-DMA/Building-Regulariser/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/DPIRD-DMA/Building-Regulariser/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/DPIRD-DMA/Building-Regulariser/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/DPIRD-DMA/Building-Regulariser/compare/v0.2.2...v0.2.4
 [0.2.2]: https://github.com/DPIRD-DMA/Building-Regulariser/compare/v0.1.12...v0.2.2
 [0.1.12]: https://github.com/DPIRD-DMA/Building-Regulariser/compare/v0.1.11...v0.1.12
