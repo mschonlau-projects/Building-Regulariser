@@ -7,6 +7,7 @@
         "geodataframe",
         "linalg",
         "ndarray",
+        "pyproj",
         "neighbour",
         "neighbourhood",
         "neighbouring",

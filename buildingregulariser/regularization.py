@@ -3,7 +3,7 @@ import warnings
 from typing import Any, List, Tuple
 
 import numpy as np
-from shapely.geometry import LinearRing, Polygon
+from shapely.geometry import LinearRing, Polygon, MultiPolygon
 
 from .geometry_utils import (
     calculate_azimuth_angle,
@@ -745,8 +745,25 @@ def preprocess_polygon(
     return polygon
 
 
+def flatten_to_polygons(geometries) -> List[Polygon]:
+    """Flatten an iterable of geometries into a list of non-empty Polygons.
+
+    MultiPolygons are unwrapped into their constituent Polygons. Empty
+    geometries and unsupported types are dropped.
+    """
+    flat: List[Polygon] = []
+    for geom in geometries:
+        if geom is None or geom.is_empty:
+            continue
+        if isinstance(geom, MultiPolygon):
+            flat.extend(p for p in geom.geoms if not p.is_empty)
+        elif isinstance(geom, Polygon):
+            flat.append(geom)
+    return flat
+
+
 def regularize_single_polygon(
-    polygon: Polygon,
+    polygon: Polygon | MultiPolygon,
     parallel_threshold: float,
     allow_45_degree: bool,
     diagonal_threshold_reduction: float,
@@ -754,9 +771,14 @@ def regularize_single_polygon(
     circle_threshold: float,
     simplify: bool,
     simplify_tolerance: float,
-) -> dict[str, Any]:
+) -> List[dict[str, Any]]:
     """
-    Regularize a Shapely polygon by aligning edges to principal directions
+    Regularize a Shapely polygon by aligning edges to principal directions.
+
+    Returns a list of result dicts. Most calls yield a single-element list,
+    but a self-intersecting input (or a regularized output that splits under
+    buffer(0)) can produce multiple Polygon pieces, each returned as its own
+    dict so per-piece metadata (iou, main_direction) is preserved.
 
     Parameters:
     -----------
@@ -778,25 +800,68 @@ def regularize_single_polygon(
 
     Returns:
     --------
-    shapely.geometry.Polygon
-        Regularized polygon
+    list[dict]
+        One dict per output Polygon, each with keys "geometry", "iou",
+        "main_direction".
     """
+    if isinstance(polygon, MultiPolygon):
+        # MultiPolygon inputs reach here when upstream make_valid() returned a
+        # GeometryCollection that explode() only flattened one level. Recurse
+        # on each part so each lobe gets its own result dict.
+        results: List[dict[str, Any]] = []
+        for p in polygon.geoms:
+            results.extend(
+                regularize_single_polygon(
+                    polygon=p,
+                    parallel_threshold=parallel_threshold,
+                    allow_45_degree=allow_45_degree,
+                    diagonal_threshold_reduction=diagonal_threshold_reduction,
+                    allow_circles=allow_circles,
+                    circle_threshold=circle_threshold,
+                    simplify=simplify,
+                    simplify_tolerance=simplify_tolerance,
+                )
+            )
+        if not results:
+            return [{"geometry": polygon, "iou": 0, "main_direction": 0}]
+        return results
     if not isinstance(polygon, Polygon):
         # Return unmodified if not a polygon
         warnings.warn(
             f"Unsupported geometry type: {type(polygon)}. Returning original.",
             stacklevel=2,
         )
-        return {"geometry": polygon, "iou": 0, "main_direction": 0}
+        return [{"geometry": polygon, "iou": 0, "main_direction": 0}]
     if polygon.is_empty:
         # Return empty polygon if input is empty
-        return {"geometry": polygon, "iou": 0, "main_direction": 0}
+        return [{"geometry": polygon, "iou": 0, "main_direction": 0}]
 
     simple_polygon = preprocess_polygon(
         polygon,
         simplify=simplify,
         simplify_tolerance=simplify_tolerance,
     ).buffer(0)
+
+    if isinstance(simple_polygon, MultiPolygon):
+        # Recurse on each part — each lobe gets regularized independently
+        # with its own iou and main_direction.
+        results = []
+        for p in simple_polygon.geoms:
+            results.extend(
+                regularize_single_polygon(
+                    polygon=p,
+                    parallel_threshold=parallel_threshold,
+                    allow_45_degree=allow_45_degree,
+                    diagonal_threshold_reduction=diagonal_threshold_reduction,
+                    allow_circles=allow_circles,
+                    circle_threshold=circle_threshold,
+                    simplify=simplify,
+                    simplify_tolerance=simplify_tolerance,
+                )
+            )
+        if not results:
+            return [{"geometry": polygon, "iou": 0, "main_direction": 0}]
+        return results
 
     exterior_coordinates = np.array(simple_polygon.exterior.coords)
 
@@ -837,7 +902,8 @@ def regularize_single_polygon(
         exterior_ring = LinearRing(regularized_exterior)
         interior_rings = [LinearRing(r) for r in regularized_interiors]
 
-        # Create regularized polygon
+        # Create regularized polygon. buffer(0) can split a self-intersecting
+        # exterior into multiple Polygons, so handle that case too.
         regularized_polygon = Polygon(exterior_ring, interior_rings).buffer(0)
         final_iou = (
             regularized_polygon.intersection(polygon).area
@@ -849,13 +915,18 @@ def regularize_single_polygon(
                 "Returning original polygon.",
                 stacklevel=2,
             )
-            return {"geometry": polygon, "iou": 0, "main_direction": 0}
-        else:
-            return {
-                "geometry": regularized_polygon,
+            return [{"geometry": polygon, "iou": 0, "main_direction": 0}]
+        pieces = flatten_to_polygons([regularized_polygon])
+        if not pieces:
+            return [{"geometry": polygon, "iou": 0, "main_direction": 0}]
+        return [
+            {
+                "geometry": piece,
                 "iou": final_iou,
                 "main_direction": main_direction,
             }
+            for piece in pieces
+        ]
 
     except Exception as e:
         # If there's an error creating the polygon, return the original
@@ -863,4 +934,4 @@ def regularize_single_polygon(
             f"Error creating regularized polygon: {e}. Returning original.",
             stacklevel=2,
         )
-        return {"geometry": polygon, "iou": 0, "main_direction": 0}
+        return [{"geometry": polygon, "iou": 0, "main_direction": 0}]

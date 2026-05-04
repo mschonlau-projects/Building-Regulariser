@@ -2,8 +2,12 @@
 
 A Python library for regularizing building footprints in geospatial data. This library helps clean up and standardize building polygon geometries by aligning edges to principal directions. Built as an open source alternative to the [ArcGIS Regularize Building Footprint (3D Analyst) tool](https://pro.arcgis.com/en/pro-app/latest/tool-reference/3d-analyst/regularize-building-footprint.htm).
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)]()
-[![License](https://img.shields.io/badge/License-MIT-green)]()
+[![PyPI](https://img.shields.io/pypi/v/buildingregulariser)](https://pypi.org/project/buildingregulariser/)
+[![conda-forge](https://img.shields.io/conda/vn/conda-forge/buildingregulariser)](https://anaconda.org/conda-forge/buildingregulariser)
+[![Downloads](https://static.pepy.tech/badge/buildingregulariser)](https://pepy.tech/project/buildingregulariser)
+[![Python](https://img.shields.io/pypi/pyversions/buildingregulariser)](https://pypi.org/project/buildingregulariser/)
+[![CI](https://github.com/DPIRD-DMA/Building-Regulariser/actions/workflows/ci.yml/badge.svg)](https://github.com/DPIRD-DMA/Building-Regulariser/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ## Example Results
 
@@ -93,14 +97,14 @@ regularized = regularize_geodataframe(buildings)
 ```python
 regularized = regularize_geodataframe(
     buildings,
-    parallel_threshold=2.0,   # Higher values allow less edge alignment
-    simplify_tolerance=0.5,   # Controls simplification level, should be 2-3 x the raster pixel size
-    allow_45_degree=True,     # Enable 45-degree angles
-    allow_circles=True,       # Enable circle detection
-    circle_threshold=0.9      # IOU threshold for circle detection
-    neighbor_alignment=True,  # After regularization try to align each building with neighboring buildings
-    neighbor_search_distance: float = 100.0, # The search distance around each building to find neighbors
-    neighbor_max_rotation: float = 10, # The maximum rotation allowed to align with neighbors
+    parallel_threshold=2.0,        # Higher values allow less edge alignment
+    simplify_tolerance=0.5,        # Controls simplification level, should be 2-3 x the raster pixel size
+    allow_45_degree=True,          # Enable 45-degree angles
+    allow_circles=True,            # Enable circle detection
+    circle_threshold=0.9,          # IOU threshold for circle detection
+    neighbor_alignment=True,       # After regularization try to align each building with neighboring buildings
+    neighbor_search_distance=100,  # Search distance around each building when looking for neighbors
+    neighbor_max_rotation=10,      # Maximum rotation allowed to align with neighbors
 )
 ```
 
@@ -108,16 +112,17 @@ regularized = regularize_geodataframe(
 
 - **geodataframe**: Input GeoDataFrame with polygon geometries
 - **parallel_threshold**: Distance threshold for handling parallel lines (default: 1.0)
+- **target_crs**: Optional CRS (string or `pyproj.CRS`) to reproject the input to before regularization (default: None)
 - **simplify**: If True, applies simplification to the geometry (default: True)
 - **simplify_tolerance**: Tolerance for simplification (default: 0.5)
 - **allow_45_degree**: If True, allows edges to be oriented at 45-degree angles (default: True)
 - **diagonal_threshold_reduction**: Used to reduce the chance of diagonal edges being generated, can be from 0 to 22.5 (default: 15.0)
 - **allow_circles**: If True, detects and converts near-circular shapes to perfect circles (default: True)
 - **circle_threshold**: Intersection over Union (IoU) threshold for circle detection (default: 0.9)
-- **num_cores**: Number of CPU cores to use for parallel processing (default: 1)
-- **include_metadata**: Include the main direction, IOU, perimeter and aligned_direction (if used) in output gdf
+- **num_cores**: Number of CPU cores to use for parallel processing; 0 uses all available cores (default: 0)
+- **include_metadata**: Include the main direction, IOU, perimeter and aligned_direction (if used) in output gdf (default: False)
 - **neighbor_alignment**: If True, try to align each building with neighboring buildings (default: False)
-- **neighbor_search_distance**: The distance to find neighboring buildings (default: 350.0)
+- **neighbor_search_distance**: The distance to find neighboring buildings (default: 100.0)
 - **neighbor_max_rotation**: The maximum allowable rotation to align with neighbors (default: 10)
 
 

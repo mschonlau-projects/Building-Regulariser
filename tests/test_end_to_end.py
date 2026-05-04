@@ -8,11 +8,25 @@ from shapely.geometry.base import BaseGeometry
 from buildingregulariser import regularize_geodataframe
 
 cwd = Path(__file__).parent
-OUTPUT_FILE = cwd.parent / "test data/output/test output.gpkg"
-if OUTPUT_FILE.exists():
-    OUTPUT_FILE.unlink()
+OUTPUT_FILE = cwd / "output/test output.gpkg"
 INPUT_FILE = cwd.parent / "test data/input/test_data.gpkg"
-DEFAULT_PARAMS = dict(
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _manage_output_dir():
+    output_dir = OUTPUT_FILE.parent
+    created = not output_dir.exists()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    OUTPUT_FILE.unlink(missing_ok=True)
+    yield
+    OUTPUT_FILE.unlink(missing_ok=True)
+    if created:
+        for child in output_dir.iterdir():
+            child.unlink()
+        output_dir.rmdir()
+
+
+DEFAULT_PARAMS: dict[str, Any] = dict(
     parallel_threshold=1.0,
     simplify=True,
     simplify_tolerance=0.5,
@@ -42,26 +56,27 @@ def check_geometry_quality(inputs, outputs, iou_threshold=0.4, perimeter_toleran
     assert not outputs.empty
     assert outputs.geometry.is_valid.all()
     assert outputs.geometry.notnull().all()
-    assert len(inputs) == len(
-        outputs
-    ), f"Row count mismatch: {len(inputs)} != {len(outputs)}"
+    assert len(inputs) == len(outputs), (
+        f"Row count mismatch: {len(inputs)} != {len(outputs)}"
+    )
 
     for idx, (i_geom, o_geom) in enumerate(zip(inputs.geometry, outputs.geometry)):
         assert i_geom.intersects(o_geom), f"No intersection for feature {idx}"
 
         overlap_iou = iou(i_geom, o_geom)
-        assert (
-            overlap_iou >= iou_threshold
-        ), f"Low IoU for feature {idx}: {overlap_iou:.2f}"
+        assert overlap_iou >= iou_threshold, (
+            f"Low IoU for feature {idx}: {overlap_iou:.2f}"
+        )
 
         in_perim = i_geom.length
         out_perim = o_geom.length
         min_perim = in_perim * (1 - perimeter_tolerance)
         max_perim = in_perim * (1 + perimeter_tolerance)
 
-        assert (
-            min_perim <= out_perim <= max_perim
-        ), f"Perimeter out of range for feature {idx}: {out_perim:.2f} (expected {min_perim:.2f}–{max_perim:.2f})"
+        assert min_perim <= out_perim <= max_perim, (
+            f"Perimeter out of range for feature {idx}: {out_perim:.2f} "
+            f"(expected {min_perim:.2f}–{max_perim:.2f})"
+        )
 
 
 # --- Parametrized Tests ---
