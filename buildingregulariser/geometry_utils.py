@@ -252,7 +252,7 @@ def rotate_edge(
         rotated_start = rotate_point(start_point, midpoint, np.abs(rotation_angle))
         rotated_end = rotate_point(end_point, midpoint, np.abs(rotation_angle))
     else:
-        rotated_start = start_point
-        rotated_end = end_point
+        rotated_start = (float(start_point[0]), float(start_point[1]))
+        rotated_end = (float(end_point[0]), float(end_point[1]))
 
     return [np.array(rotated_start), np.array(rotated_end)]

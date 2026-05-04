@@ -194,7 +194,16 @@ def regularize_geodataframe(
                 result_geodataframe["geometry"],
             )
 
-    results_df = pd.DataFrame(processed_data)
+    # regularize_single_polygon returns a list of dicts (length 1 normally,
+    # >1 when a self-intersecting polygon was split into multiple Polygons
+    # — each piece keeps its own iou and main_direction).
+    counts = [len(r) for r in processed_data]
+    flat_results = [item for sub in processed_data for item in sub]
+
+    result_geodataframe = result_geodataframe.loc[
+        result_geodataframe.index.repeat(counts)
+    ].reset_index(drop=True)
+    results_df = pd.DataFrame(flat_results)
     result_geodataframe["geometry"] = results_df["geometry"]
     result_geodataframe["iou"] = results_df["iou"]
     result_geodataframe["main_direction"] = results_df["main_direction"]
